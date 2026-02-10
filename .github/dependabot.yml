@@ -4,11 +4,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    groups:
-      dev-dependencies:
-        dependency-type: development
-      production-dependencies:
-        dependency-type: production
+    allow:
+      - dependency-name: "@actions/core"
+      - dependency-name: "@actions/glob"
+      - dependency-name: js-tiktoken
 
   - package-ecosystem: github-actions
     directory: /
