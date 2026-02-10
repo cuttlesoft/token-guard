@@ -1,0 +1,64 @@
+name: Test Token Check Action
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-total-mode:
+    name: Test total mode (should pass)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        id: token-check
+        with:
+          patterns: |
+            **/*.md
+          max_tokens: '100000'
+          token_limit_mode: total
+      - run: |
+          echo "Total tokens: ${{ steps.token-check.outputs.total_tokens }}"
+          echo "File count: ${{ steps.token-check.outputs.file_count }}"
+
+  test-total-mode-fail:
+    name: Test total mode (should fail)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        id: token-check
+        continue-on-error: true
+        with:
+          patterns: |
+            **/*.ts
+          max_tokens: '10'
+          token_limit_mode: total
+      - run: |
+          if [ "${{ steps.token-check.outcome }}" != "failure" ]; then
+            echo "Expected failure but got ${{ steps.token-check.outcome }}"
+            exit 1
+          fi
+          echo "Correctly failed with total over limit"
+
+  test-per-file-mode:
+    name: Test per_file mode (should fail)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        id: token-check
+        continue-on-error: true
+        with:
+          patterns: |
+            src/**/*.ts
+          max_tokens: '50'
+          token_limit_mode: per_file
+      - run: |
+          if [ "${{ steps.token-check.outcome }}" != "failure" ]; then
+            echo "Expected failure but got ${{ steps.token-check.outcome }}"
+            exit 1
+          fi
+          echo "Files over limit: ${{ steps.token-check.outputs.files_over_limit }}"

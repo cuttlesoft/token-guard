@@ -1,0 +1,37 @@
+name: 'Token Guard — LLM Token Limit Checker'
+description: 'Count tokens in files using tiktoken and enforce configurable limits'
+author: 'Cuttlesoft'
+
+inputs:
+  patterns:
+    description: 'Glob patterns, one per line. Supports ! negation.'
+    required: true
+    default: '**/*.md'
+  max_tokens:
+    description: 'Token limit threshold'
+    required: false
+    default: '2500'
+  token_limit_mode:
+    description: '"total" (sum of all files) or "per_file" (each file individually)'
+    required: false
+    default: 'total'
+  encoding:
+    description: 'Tiktoken encoding: cl100k_base, o200k_base, p50k_base, p50k_edit, r50k_base'
+    required: false
+    default: 'cl100k_base'
+
+outputs:
+  total_tokens:
+    description: 'Sum of tokens across all matched files'
+  file_count:
+    description: 'Number of files processed'
+  files_over_limit:
+    description: 'Comma-separated paths of files over limit (per_file mode)'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+
+branding:
+  icon: 'file-text'
+  color: 'blue'
