@@ -85,6 +85,26 @@ Enforce limits on each file individually:
     token_limit_mode: per_file
 ```
 
+### Multiple encodings
+
+Each invocation uses a single encoding. To check files against different model tokenizers, use multiple steps:
+
+```yaml
+- uses: cuttlesoft/token-guard@v1
+  with:
+    patterns: |
+      prompts/gpt4/**
+    encoding: cl100k_base
+    max_tokens: "4000"
+
+- uses: cuttlesoft/token-guard@v1
+  with:
+    patterns: |
+      prompts/gpt4o/**
+    encoding: o200k_base
+    max_tokens: "4000"
+```
+
 ### Using outputs
 
 ```yaml
@@ -128,7 +148,7 @@ File Token Counts
 | `patterns`         | Yes      | [LLM instruction files](#default-patterns) | Glob patterns targeting LLM instruction/config files, one per line. Supports `!` negation. |
 | `max_tokens`       | No       | `2500`                                     | Token limit threshold                                                                      |
 | `token_limit_mode` | No       | `total`                                    | `total` (sum) or `per_file` (each file)                                                    |
-| `encoding`         | No       | `cl100k_base`                              | Tiktoken encoding                                                                          |
+| `encoding`         | No       | `cl100k_base`                              | Tiktoken encoding (see [note on encoding](#a-note-on-encoding))                            |
 
 ### Default Patterns
 
@@ -143,6 +163,19 @@ Out of the box, Token Guard targets known LLM instruction and configuration file
 | `.clinerules`                                                                | Cline                     |
 | `.github/copilot-instructions.md`, `.github/prompts/**`, `.github/agents/**` | GitHub Copilot            |
 | `prompts/**`, `.prompts/**`                                                  | Common prompt directories |
+
+### A Note on Encoding
+
+Token counts vary by encoding (tokenizer). The default `cl100k_base` is a reasonable general-purpose choice, but it won't exactly match every model's tokenizer — for example, Claude uses its own tokenizer that isn't available in tiktoken. In practice the variance between encodings for small config files is roughly 10-20%, so a single encoding works well as a budget guardrail.
+
+> [!IMPORTANT]  
+> If you need precise counts per model, use separate invocations with different encodings and patterns (see [Multiple encodings](#multiple-encodings)).
+
+| Encoding      | Models               |
+| ------------- | -------------------- |
+| `cl100k_base` | GPT-4, GPT-3.5       |
+| `o200k_base`  | GPT-4o, o1, o3       |
+| `p50k_base`   | Claude, Codex, GPT-3 |
 
 ## Outputs
 
