@@ -97,4 +97,9 @@ async function run(): Promise<void> {
   }
 }
 
-run();
+export { run };
+
+/* istanbul ignore next */
+if (require.main === module) {
+  run();
+}

@@ -1,19 +1,15 @@
 # token-guard
 
-[![AI and machine learning development and consulting services. Specialized in LLM integration, prompt engineering, and custom AI solutions. Expert developers building intelligent applications for modern business needs.](https://static.cuttlesoft.com/wp-content/uploads/2026/02/10171038/970x250-banner-variation-23.png)](https://cuttlesoft.com/services/ai-ml-development-and-consulting/)
+[![AI and machine learning development and consulting services. Specialized in LLM integration, AI product development, and custom AI solutions. Expert developers building intelligent applications for modern business needs.](https://static.cuttlesoft.com/wp-content/uploads/2026/02/10171038/970x250-banner-variation-23.png)](https://cuttlesoft.com/services/ai-ml-development-and-consulting/)
 
 A GitHub Action that counts tokens in your files using [tiktoken](https://github.com/openai/tiktoken) and enforces configurable limits. Catch context window overflows in CI before they hit production.
 
 ## 📦 Install
 
-Add to any workflow — no installation required:
+Add to any workflow — no installation required. Zero-config defaults target known LLM instruction files (Claude, Cursor, Copilot, Windsurf, Cline, etc.) with a 2,500 token limit:
 
 ```yaml
 - uses: cuttlesoft/token-guard@v1
-  with:
-    patterns: |
-      **/*.md
-    max_tokens: "2500"
 ```
 
 ## ✨ Features
@@ -61,13 +57,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: cuttlesoft/token-guard@v1
-        with:
-          patterns: |
-            docs/**/*.md
-            prompts/**/*.txt
-          max_tokens: "4000"
-          token_limit_mode: total
-          encoding: cl100k_base
+```
+
+### Custom patterns
+
+Override the defaults to target specific files:
+
+```yaml
+- uses: cuttlesoft/token-guard@v1
+  with:
+    patterns: |
+      docs/**/*.md
+      prompts/**/*.txt
+    max_tokens: "4000"
 ```
 
 ### Per-file mode
@@ -89,7 +91,6 @@ Enforce limits on each file individually:
 - uses: cuttlesoft/token-guard@v1
   id: tokens
   with:
-    patterns: '**/*.md'
     max_tokens: '100000'
 - run: echo "Total tokens: ${{ steps.tokens.outputs.total_tokens }}"
 ```
@@ -111,23 +112,37 @@ File Token Counts
 
 ### Job summary
 
-| File | Tokens | Status |
-|------|--------|--------|
-| docs/getting-started.md | 1,243 | :white_check_mark: Pass |
-| docs/api-reference.md | 3,891 | :no_entry: Over limit |
-| docs/faq.md | 487 | :white_check_mark: Pass |
-| **Total (3 files)** | **5,621** | :no_entry: Over limit |
+| File                    | Tokens    | Status                  |
+| ----------------------- | --------- | ----------------------- |
+| docs/getting-started.md | 1,243     | :white_check_mark: Pass |
+| docs/api-reference.md   | 3,891     | :no_entry: Over limit   |
+| docs/faq.md             | 487       | :white_check_mark: Pass |
+| **Total (3 files)**     | **5,621** | :no_entry: Over limit   |
 
 **Mode:** per_file | **Limit:** 2,500 | **Encoding:** cl100k_base
 
 ## Inputs
 
-| Name               | Required | Default       | Description                                         |
-| ------------------ | -------- | ------------- | --------------------------------------------------- |
-| `patterns`         | Yes      | `**/*.md`     | Glob patterns, one per line. Supports `!` negation. |
-| `max_tokens`       | No       | `2500`        | Token limit threshold                               |
-| `token_limit_mode` | No       | `total`       | `total` (sum) or `per_file` (each file)             |
-| `encoding`         | No       | `cl100k_base` | Tiktoken encoding                                   |
+| Name               | Required | Default                                    | Description                                                                                |
+| ------------------ | -------- | ------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `patterns`         | Yes      | [LLM instruction files](#default-patterns) | Glob patterns targeting LLM instruction/config files, one per line. Supports `!` negation. |
+| `max_tokens`       | No       | `2500`                                     | Token limit threshold                                                                      |
+| `token_limit_mode` | No       | `total`                                    | `total` (sum) or `per_file` (each file)                                                    |
+| `encoding`         | No       | `cl100k_base`                              | Tiktoken encoding                                                                          |
+
+### Default Patterns
+
+Out of the box, Token Guard targets known LLM instruction and configuration files:
+
+| Pattern                                                                      | Tool                      |
+| ---------------------------------------------------------------------------- | ------------------------- |
+| `**/CLAUDE.md`, `.claude/**`                                                 | Claude Code               |
+| `**/AGENTS.md`                                                               | OpenAI Codex              |
+| `.cursorrules`, `.cursor/rules/**`                                           | Cursor                    |
+| `.windsurfrules`                                                             | Windsurf                  |
+| `.clinerules`                                                                | Cline                     |
+| `.github/copilot-instructions.md`, `.github/prompts/**`, `.github/agents/**` | GitHub Copilot            |
+| `prompts/**`, `.prompts/**`                                                  | Common prompt directories |
 
 ## Outputs
 

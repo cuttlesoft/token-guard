@@ -4,9 +4,21 @@ author: 'Cuttlesoft'
 
 inputs:
   patterns:
-    description: 'Glob patterns, one per line. Supports ! negation.'
+    description: 'Glob patterns targeting LLM instruction/config files, one per line. Supports ! negation.'
     required: true
-    default: '**/*.md'
+    default: |
+      **/CLAUDE.md
+      .claude/**
+      **/AGENTS.md
+      .cursorrules
+      .cursor/rules/**
+      .windsurfrules
+      .clinerules
+      .github/copilot-instructions.md
+      .github/prompts/**
+      .github/agents/**
+      prompts/**
+      .prompts/**
   max_tokens:
     description: 'Token limit threshold'
     required: false
