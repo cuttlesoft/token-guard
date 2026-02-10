@@ -19,58 +19,244 @@ jobs:
       - run: npm ci
       - run: npm test
 
-  test-total-mode:
-    name: Test total mode (should pass)
+  # ---------------------------------------------------------------------------
+  # Integration tests — exercise the action the same way users would via
+  # `uses: cuttlesoft/token-guard@v1`, substituting `uses: ./` for local runs.
+  # Each job creates fixture files that match the default patterns so we can
+  # verify real glob matching, token counting, outputs, and failure behaviour.
+  # ---------------------------------------------------------------------------
+
+  test-zero-config:
+    name: "Zero-config defaults (should pass)"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Create LLM config fixtures
+        run: |
+          echo "# Claude code instructions" > CLAUDE.md
+          mkdir -p .claude && echo "claude config" > .claude/config.md
+          echo "# Agents" > AGENTS.md
+          echo "cursor rules" > .cursorrules
+          mkdir -p .cursor/rules && echo "rule" > .cursor/rules/default.md
+          echo "windsurf" > .windsurfrules
+          echo "cline" > .clinerules
+          mkdir -p .github/prompts
+          echo "copilot" > .github/copilot-instructions.md
+          echo "prompt" > .github/prompts/review.md
+          mkdir -p .github/agents && echo "agent" > .github/agents/qa.md
+          mkdir -p prompts && echo "system" > prompts/system.md
+          mkdir -p .prompts && echo "hidden" > .prompts/internal.md
+
+      # Zero-config: no `with:` block at all — just like the README quick start
       - uses: ./
-        id: token-check
+        id: check
+
+      - name: Verify outputs
+        run: |
+          echo "Total tokens: ${{ steps.check.outputs.total_tokens }}"
+          echo "File count:   ${{ steps.check.outputs.file_count }}"
+          FILE_COUNT="${{ steps.check.outputs.file_count }}"
+          if [ "$FILE_COUNT" -lt 5 ]; then
+            echo "::error::Expected >= 5 matched files but got $FILE_COUNT"
+            exit 1
+          fi
+
+  test-zero-config-fail:
+    name: "Zero-config defaults over limit (should fail)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create LLM config fixtures
+        run: |
+          echo "# Claude code instructions with enough content to exceed a tiny limit" > CLAUDE.md
+          echo "cursor rules content" > .cursorrules
+          echo "windsurf rules content" > .windsurfrules
+
+      # Only override max_tokens — patterns still use defaults
+      - uses: ./
+        id: check
+        continue-on-error: true
+        with:
+          max_tokens: "1"
+
+      - name: Verify failure
+        run: |
+          if [ "${{ steps.check.outcome }}" != "failure" ]; then
+            echo "::error::Expected failure but got ${{ steps.check.outcome }}"
+            exit 1
+          fi
+
+  test-custom-patterns:
+    name: "Custom patterns override defaults (should pass)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./
+        id: check
         with:
           patterns: |
             **/*.md
-          max_tokens: '100000'
-          token_limit_mode: total
-      - run: |
-          echo "Total tokens: ${{ steps.token-check.outputs.total_tokens }}"
-          echo "File count: ${{ steps.token-check.outputs.file_count }}"
+          max_tokens: "100000"
 
-  test-total-mode-fail:
-    name: Test total mode (should fail)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        id: token-check
-        continue-on-error: true
-        with:
-          patterns: |
-            **/*.ts
-          max_tokens: '10'
-          token_limit_mode: total
-      - run: |
-          if [ "${{ steps.token-check.outcome }}" != "failure" ]; then
-            echo "Expected failure but got ${{ steps.token-check.outcome }}"
+      - name: Verify outputs
+        run: |
+          echo "Total tokens: ${{ steps.check.outputs.total_tokens }}"
+          echo "File count:   ${{ steps.check.outputs.file_count }}"
+          if [ "${{ steps.check.outputs.file_count }}" -lt 1 ]; then
+            echo "::error::Expected at least 1 file"
             exit 1
           fi
-          echo "Correctly failed with total over limit"
 
-  test-per-file-mode:
-    name: Test per_file mode (should fail)
+  test-total-mode-fail:
+    name: "Total mode over limit (should fail)"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: ./
-        id: token-check
+        id: check
         continue-on-error: true
         with:
           patterns: |
             src/**/*.ts
-          max_tokens: '50'
-          token_limit_mode: per_file
-      - run: |
-          if [ "${{ steps.token-check.outcome }}" != "failure" ]; then
-            echo "Expected failure but got ${{ steps.token-check.outcome }}"
+          max_tokens: "10"
+          token_limit_mode: total
+
+      - name: Verify failure
+        run: |
+          if [ "${{ steps.check.outcome }}" != "failure" ]; then
+            echo "::error::Expected failure but got ${{ steps.check.outcome }}"
             exit 1
           fi
-          echo "Files over limit: ${{ steps.token-check.outputs.files_over_limit }}"
+
+  test-per-file-pass:
+    name: "Per-file mode all under limit (should pass)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./
+        id: check
+        with:
+          patterns: |
+            **/*.md
+          max_tokens: "100000"
+          token_limit_mode: per_file
+
+      - name: Verify pass
+        run: |
+          if [ "${{ steps.check.outcome }}" != "success" ]; then
+            echo "::error::Expected success but got ${{ steps.check.outcome }}"
+            exit 1
+          fi
+          if [ -n "${{ steps.check.outputs.files_over_limit }}" ]; then
+            echo "::error::Expected no files over limit"
+            exit 1
+          fi
+
+  test-per-file-fail:
+    name: "Per-file mode over limit (should fail)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./
+        id: check
+        continue-on-error: true
+        with:
+          patterns: |
+            src/**/*.ts
+          max_tokens: "50"
+          token_limit_mode: per_file
+
+      - name: Verify failure and files_over_limit output
+        run: |
+          if [ "${{ steps.check.outcome }}" != "failure" ]; then
+            echo "::error::Expected failure but got ${{ steps.check.outcome }}"
+            exit 1
+          fi
+          if [ -z "${{ steps.check.outputs.files_over_limit }}" ]; then
+            echo "::error::Expected files_over_limit to be populated"
+            exit 1
+          fi
+          echo "Files over limit: ${{ steps.check.outputs.files_over_limit }}"
+
+  test-negation-patterns:
+    name: "Negation patterns exclude files (should pass)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create fixtures
+        run: |
+          mkdir -p prompts
+          echo "keep" > prompts/system.md
+          # This large file would bust the limit if not excluded
+          python3 -c "print('word ' * 5000)" > prompts/huge.md
+
+      - uses: ./
+        id: check
+        with:
+          patterns: |
+            prompts/**
+            !prompts/huge.md
+          max_tokens: "500"
+
+      - name: Verify only non-excluded file matched
+        run: |
+          if [ "${{ steps.check.outputs.file_count }}" != "1" ]; then
+            echo "::error::Expected 1 file after negation but got ${{ steps.check.outputs.file_count }}"
+            exit 1
+          fi
+
+  test-encoding:
+    name: "Alternate encoding o200k_base (should pass)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./
+        id: check
+        with:
+          patterns: |
+            README.md
+          max_tokens: "100000"
+          encoding: o200k_base
+
+      - name: Verify tokens counted
+        run: |
+          TOKENS="${{ steps.check.outputs.total_tokens }}"
+          if [ "$TOKENS" -lt 1 ]; then
+            echo "::error::Expected tokens > 0 with o200k_base but got $TOKENS"
+            exit 1
+          fi
+          echo "Tokens with o200k_base: $TOKENS"
+
+  test-outputs:
+    name: "All outputs populated correctly"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./
+        id: check
+        with:
+          patterns: |
+            README.md
+          max_tokens: "100000"
+
+      - name: Verify all outputs
+        run: |
+          TOTAL="${{ steps.check.outputs.total_tokens }}"
+          COUNT="${{ steps.check.outputs.file_count }}"
+          OVER="${{ steps.check.outputs.files_over_limit }}"
+
+          if [ -z "$TOTAL" ]; then echo "::error::total_tokens is empty" && exit 1; fi
+          if [ "$TOTAL" -lt 1 ]; then echo "::error::total_tokens should be > 0" && exit 1; fi
+          if [ "$COUNT" != "1" ]; then echo "::error::file_count should be 1, got $COUNT" && exit 1; fi
+          if [ -n "$OVER" ]; then echo "::error::files_over_limit should be empty" && exit 1; fi
+
+          echo "total_tokens=$TOTAL file_count=$COUNT files_over_limit='$OVER'"
