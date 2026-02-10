@@ -2,5 +2,9 @@ node_modules/
 lib/
 *.js.map
 
+# Compiled test artifacts (ts-jest handles compilation at runtime)
+tests/**/*.js
+tests/**/*.d.ts
+
 # Keep dist/ committed (required for GitHub Actions)
 !dist/
