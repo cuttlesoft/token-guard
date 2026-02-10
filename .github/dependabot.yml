@@ -8,6 +8,12 @@ updates:
       - dependency-name: "@actions/core"
       - dependency-name: "@actions/glob"
       - dependency-name: js-tiktoken
+    ignore:
+      # ESM-only — incompatible with our CJS toolchain (ncc + jest)
+      - dependency-name: "@actions/core"
+        versions: [">=2.0.0"]
+      - dependency-name: "@actions/glob"
+        versions: [">=0.6.0"]
 
   - package-ecosystem: github-actions
     directory: /
